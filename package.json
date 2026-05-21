@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm --prefix frontend install && npm --prefix frontend run build"
+    "build": "npm --prefix frontend install --legacy-peer-deps && npm --prefix frontend run build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
