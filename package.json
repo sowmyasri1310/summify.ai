@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
+    "@langchain/google-genai": "^0.1.8",
+    "langchain": "^0.2.3",
     "@napi-rs/canvas": "^0.1.80",
     "axios": "^1.6.8",
     "cheerio": "^1.0.0-rc.12",
@@ -16,6 +18,6 @@
     "express": "^4.19.2",
     "mongoose": "^8.3.2",
     "openai": "^4.38.3",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "1.1.1"
   }
 }
