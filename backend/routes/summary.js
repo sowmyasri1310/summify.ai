@@ -1,7 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import { createRequire } from 'module';
 import Summary from '../models/Summary.js';
@@ -291,46 +291,35 @@ router.post('/summarize', async (req, res) => {
     // 2. Build AI Prompt
     const prompt = buildPrompt(textToSummarize, format, mood, length, isMultimodalImage);
 
-    // 3. Generate summary using Gemini, OpenAI, or Grok
+    // 3. Generate summary using Groq, OpenAI, or Grok
     let summary = '';
     let apiWarning = '';
-    const aiProvider = process.env.AI_PROVIDER || 'gemini';
-    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const aiProvider = process.env.AI_PROVIDER || 'groq';
 
-    if (aiProvider === 'gemini' && geminiApiKey) {
+    if (aiProvider === 'groq' && process.env.GROQ_API_KEY) {
       try {
-        const ai = new GoogleGenerativeAI(geminiApiKey);
-        const modelName = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-        const model = ai.getGenerativeModel({ model: modelName });
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        const modelName = 'llama3-8b-8192';
         
-        let result;
+        let completion;
         if (isMultimodalImage) {
-          const imagePart = {
-            inlineData: {
-              data: fileData, // raw base64 string
-              mimeType: mimeType || 'image/png'
-            }
-          };
-          result = await model.generateContent([prompt, imagePart]);
+          apiWarning = "Groq model 'llama3-8b-8192' does not natively support direct image uploads. Synthesizing text-based mock instead.";
+          throw new Error("Groq image OCR not supported for this model.");
         } else {
-          result = await model.generateContent(prompt);
+          completion = await groq.chat.completions.create({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+          });
+          summary = completion.choices[0].message.content.trim();
         }
+      } catch (groqErr) {
+        const errMsg = groqErr && groqErr.message ? String(groqErr.message) : 'Unknown Groq API Error';
+        console.error("Groq API error, falling back gracefully to mock:", errMsg);
         
-        const response = await result.response;
-        summary = response.text().trim();
-      } catch (geminiErr) {
-        const errMsg = geminiErr && geminiErr.message ? String(geminiErr.message) : 'Unknown Gemini API Error';
-        console.error("Gemini API error, falling back gracefully to mock:", errMsg);
-        
-        let detailedWarning = `Gemini API Call failed: ${errMsg}. `;
-        if (
-          errMsg.toLowerCase().includes("key") || 
-          errMsg.toLowerCase().includes("api key") || 
-          errMsg.toLowerCase().includes("quota") || 
-          errMsg.toLowerCase().includes("blocked") ||
-          errMsg.toLowerCase().includes("invalid")
-        ) {
-          detailedWarning += "Please verify your GEMINI_API_KEY in your backend .env file or check your usage quotas.";
+        let detailedWarning = `Groq API Call failed: ${errMsg}. `;
+        if (errMsg.toLowerCase().includes("key")) {
+          detailedWarning += "Please verify your GROQ_API_KEY in your backend .env file.";
         }
         
         summary = generateMockSummary(format, mood, length, errMsg);
@@ -416,31 +405,27 @@ router.post('/summarize', async (req, res) => {
         summary = generateMockSummary(format, mood, length, errMsg);
         apiWarning = detailedWarning;
       }
-    } else if (process.env.GEMINI_API_KEY) {
-      // Direct fallback to Gemini if key is provided and aiProvider did not match
+    } else if (process.env.GROQ_API_KEY) {
+      // Direct fallback to Groq if key is provided and aiProvider did not match
       try {
-        const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        const modelName = 'llama3-8b-8192';
         
-        let result;
         if (isMultimodalImage) {
-          const imagePart = {
-            inlineData: {
-              data: fileData,
-              mimeType: mimeType || 'image/png'
-            }
-          };
-          result = await model.generateContent([prompt, imagePart]);
+          apiWarning = "Groq direct fallback failed: image uploads not supported for this model.";
+          throw new Error("Groq image OCR not supported.");
         } else {
-          result = await model.generateContent(prompt);
+          const completion = await groq.chat.completions.create({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+          });
+          summary = completion.choices[0].message.content.trim();
         }
-        
-        const response = await result.response;
-        summary = response.text().trim();
-      } catch (geminiErr) {
-        const errMsg = geminiErr && geminiErr.message ? String(geminiErr.message) : 'Unknown Gemini API Error';
+      } catch (groqErr) {
+        const errMsg = groqErr && groqErr.message ? String(groqErr.message) : 'Unknown Groq API Error';
         summary = generateMockSummary(format, mood, length, errMsg);
-        apiWarning = `Gemini direct fallback failed: ${errMsg}`;
+        apiWarning = `Groq direct fallback failed: ${errMsg}`;
       }
     } else {
       // Dynamic fallback/Mock summary to facilitate evaluation when no keys are supplied
@@ -470,7 +455,7 @@ router.post('/summarize', async (req, res) => {
       title,
       summary,
       savedDoc,
-      warning: apiWarning || ((!process.env.GROK_API_KEY && !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) ? "API Key missing; displaying mock demonstration summary." : undefined)
+      warning: apiWarning || ((!process.env.GROK_API_KEY && !process.env.GROQ_API_KEY && !process.env.OPENAI_API_KEY) ? "API Key missing; displaying mock demonstration summary." : undefined)
     });
 
   } catch (error) {

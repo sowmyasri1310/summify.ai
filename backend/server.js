@@ -2,11 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import summaryRoutes from './routes/summary.js';
-
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 dotenv.config();
+console.log(process.env);
+
+
+import summaryRoutes from './routes/summary.js';
+
+import { ChatGroq } from "@langchain/groq";
+
+
 
 const app = express();
 
@@ -16,33 +21,88 @@ const MONGO_URI =
   process.env.MONGO_URI ||
   'mongodb://127.0.0.1:27017/summarizer';
 
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash",
-  apiKey: process.env.GOOGLE_API_KEY,
+/* =========================
+   LANGSMITH ENV CHECK
+========================= */
+
+if (!process.env.LANGSMITH_API_KEY) {
+  console.warn(
+    "⚠️ LANGSMITH_API_KEY is missing"
+  );
+}
+
+if (!process.env.GROQ_API_KEY) {
+  console.warn(
+    "⚠️ GROQ_API_KEY is missing"
+  );
+}
+
+/* =========================
+   GROQ MODEL
+========================= */
+
+const model = new ChatGroq({
+  model: "llama-3.1-8b-instant",
+  apiKey: process.env.GROQ_API_KEY,
+  temperature: 0.3,
 });
+
+/* =========================
+   MIDDLEWARE
+========================= */
 
 app.use(cors());
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({
+  limit: '20mb'
+}));
 
 app.use(express.urlencoded({
   limit: '20mb',
   extended: true
 }));
 
+/* =========================
+   ROUTES
+========================= */
+
 app.use('/api', summaryRoutes);
 
+/* =========================
+   HOME ROUTE
+========================= */
+
 app.get('/', (req, res) => {
+
   res.json({
-    message: 'Content Summarizer API is running successfully.'
+    success: true,
+    message:
+      'Content Summarizer API is running successfully.',
+    langsmithTracing:
+      process.env.LANGSMITH_TRACING === "true",
   });
+
 });
 
+/* =========================
+   LANGSMITH TEST ROUTE
+========================= */
+
 app.get('/test-trace', async (req, res) => {
+
   try {
 
-    const result =
-      await model.invoke("Say hello from Gemini");
+    console.log(
+      "Sending request to Groq..."
+    );
+
+    const result = await model.invoke(
+      "Say hello from Groq and explain AI in one sentence."
+    );
+
+    console.log(
+      "Groq response received."
+    );
 
     res.json({
       success: true,
@@ -51,31 +111,55 @@ app.get('/test-trace', async (req, res) => {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Trace test failed:",
+      error
+    );
 
     res.status(500).json({
+      success: false,
       error: error.message,
     });
+
   }
+
 });
+
+/* =========================
+   DATABASE CONNECTION
+========================= */
 
 mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log('Successfully connected to MongoDB.');
+
+    console.log(
+      '✅ Successfully connected to MongoDB.'
+    );
+
   })
   .catch((err) => {
+
     console.error(
-      'MongoDB connection failed:',
+      '❌ MongoDB connection failed:',
       err.message
     );
+
   });
+
+/* =========================
+   START SERVER
+========================= */
 
 if (!process.env.VERCEL) {
 
   app.listen(PORT, () => {
 
     console.log(
-      `Server running on port ${PORT}`
+      `🚀 Server running on port ${PORT}`
+    );
+
+    console.log(
+      `📊 LangSmith tracing: ${process.env.LANGSMITH_TRACING}`
     );
 
   });
