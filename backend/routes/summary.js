@@ -7,10 +7,17 @@ import { createRequire } from 'module';
 import Summary from '../models/Summary.js';
 
 const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
-
 
 const router = express.Router();
+
+function getPdfParser() {
+  try {
+    const { PDFParse } = require('pdf-parse');
+    return PDFParse;
+  } catch (error) {
+    throw new Error(`PDF parser initialization failed: ${error.message}`);
+  }
+}
 
 // Helper: Scrape content from a URL
 async function scrapeUrlContent(url) {
@@ -233,6 +240,7 @@ router.post('/summarize', async (req, res) => {
     } else if (sourceType === 'file') {
       if (fileType === 'pdf') {
         try {
+          const PDFParse = getPdfParser();
           const pdfBuffer = Buffer.from(fileData, 'base64');
           const parser = new PDFParse({ data: pdfBuffer });
           const pdfData = await parser.getText();
