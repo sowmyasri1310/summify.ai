@@ -278,10 +278,11 @@ router.post('/summarize', async (req, res) => {
     let summary = '';
     let apiWarning = '';
     const aiProvider = process.env.AI_PROVIDER || 'gemini';
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-    if (aiProvider === 'gemini' && process.env.GEMINI_API_KEY) {
+    if (aiProvider === 'gemini' && geminiApiKey) {
       try {
-        const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const ai = new GoogleGenerativeAI(geminiApiKey);
         const modelName = process.env.GEMINI_MODEL || 'gemini-flash-latest';
         const model = ai.getGenerativeModel({ model: modelName });
         
