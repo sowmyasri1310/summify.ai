@@ -32,16 +32,16 @@ async function scrapeUrlContent(url) {
     });
 
     const $ = cheerio.load(response.data);
-    
+
     // Remove unwanted elements
     $('script, style, nav, footer, header, noscript, iframe, svg, ads, .ads, #footer, #header').remove();
 
     const title = $('title').text().trim() || 'Scraped Article';
-    
+
     // Try to find the article content, fallback to main, then body
     let bodyText = '';
     const selectors = ['article', 'main', '.post-content', '.article-content', '#content', 'body'];
-    
+
     for (const selector of selectors) {
       const element = $(selector);
       if (element.length) {
@@ -81,7 +81,7 @@ async function scrapeUrlContent(url) {
 // Generate the prompt based on user selections
 function buildPrompt(text, format, mood, length, isMultimodalImage = false) {
   let promptText = '';
-  
+
   if (isMultimodalImage) {
     promptText = `Perform a high-fidelity analysis of the uploaded image. Extract all textual content (OCR), analyze any graphs, visual patterns, diagrams, or contextual layout details, and generate a structured summary tailored to the requested parameters.
 
@@ -173,8 +173,8 @@ function generateMockSummary(format, mood, length, apiError = '') {
   const safeMood = mood || 'beginner';
   const safeLength = length || '100';
   let mockBody = '';
-  let reason = apiError 
-    ? `because the Grok API returned: "${apiError}" (typically due to a newly created team account having 0 credits, or the selected model is not accessible).` 
+  let reason = apiError
+    ? `because the Grok API returned: "${apiError}" (typically due to a newly created team account having 0 credits, or the selected model is not accessible).`
     : "because no AI API keys are configured in your `.env` file.";
 
   if (safeFormat === 'bullets') {
@@ -201,12 +201,12 @@ A: Yes! Click the audio controls below to hear this simulated summary spoken alo
 // Route: Summarize Content
 router.post('/summarize', async (req, res) => {
   try {
-    const { 
-      sourceType, 
-      originalText, 
-      sourceUrl, 
-      format, 
-      mood, 
+    const {
+      sourceType,
+      originalText,
+      sourceUrl,
+      format,
+      mood,
       length,
       fileType,
       fileData,
@@ -242,7 +242,7 @@ router.post('/summarize', async (req, res) => {
         try {
           const pdfParseModule = getPdfParser();
           const pdfBuffer = Buffer.from(fileData, 'base64');
-          
+
           if (pdfParseModule.PDFParse) {
             const parser = new pdfParseModule.PDFParse({ data: pdfBuffer });
             const pdfData = await parser.getText();
@@ -264,7 +264,7 @@ router.post('/summarize', async (req, res) => {
           }
 
           title = fileName || 'Uploaded PDF Document';
-          
+
           if (!textToSummarize || textToSummarize.trim().length < 5) {
             throw new Error("Extracted PDF content is empty or contains non-readable elements. Try converting scanned pages to images and uploading them instead.");
           }
@@ -299,11 +299,11 @@ router.post('/summarize', async (req, res) => {
     if (aiProvider === 'groq' && process.env.GROQ_API_KEY) {
       try {
         const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-        const modelName = 'llama3-8b-8192';
-        
+        const modelName = 'llama-3.1-8b-instant';
+
         let completion;
         if (isMultimodalImage) {
-          apiWarning = "Groq model 'llama3-8b-8192' does not natively support direct image uploads. Synthesizing text-based mock instead.";
+          apiWarning = "Groq model 'llama-3.1-8b-instant' does not natively support direct image uploads. Synthesizing text-based mock instead.";
           throw new Error("Groq image OCR not supported for this model.");
         } else {
           completion = await groq.chat.completions.create({
@@ -316,12 +316,12 @@ router.post('/summarize', async (req, res) => {
       } catch (groqErr) {
         const errMsg = groqErr && groqErr.message ? String(groqErr.message) : 'Unknown Groq API Error';
         console.error("Groq API error, falling back gracefully to mock:", errMsg);
-        
+
         let detailedWarning = `Groq API Call failed: ${errMsg}. `;
         if (errMsg.toLowerCase().includes("key")) {
           detailedWarning += "Please verify your GROQ_API_KEY in your backend .env file.";
         }
-        
+
         summary = generateMockSummary(format, mood, length, errMsg);
         apiWarning = detailedWarning;
       }
@@ -332,9 +332,9 @@ router.post('/summarize', async (req, res) => {
           apiKey: process.env.GROK_API_KEY,
           baseURL: 'https://api.x.ai/v1',
         });
-        
+
         const modelName = process.env.GROK_MODEL || 'grok-beta';
-        
+
         let completion;
         if (isMultimodalImage) {
           // If Grok receives an image, we try using standard prompt asking grok to describe it if it was OCR-ed or just run text
@@ -351,17 +351,17 @@ router.post('/summarize', async (req, res) => {
       } catch (grokErr) {
         const errMsg = grokErr && grokErr.message ? String(grokErr.message) : 'Unknown Grok API Error';
         console.error("Grok API error, falling back gracefully to mock:", errMsg);
-        
+
         let detailedWarning = `Grok API Call failed: ${errMsg}. `;
         if (
-          errMsg.toLowerCase().includes("credits") || 
-          errMsg.toLowerCase().includes("permission") || 
-          errMsg.toLowerCase().includes("balance") || 
+          errMsg.toLowerCase().includes("credits") ||
+          errMsg.toLowerCase().includes("permission") ||
+          errMsg.toLowerCase().includes("balance") ||
           errMsg.toLowerCase().includes("model not found")
         ) {
           detailedWarning += "Your x.ai console team does not have any active credits/licenses, or this model is restricted. Displaying a simulated summary for evaluation.";
         }
-        
+
         summary = generateMockSummary(format, mood, length, errMsg);
         apiWarning = detailedWarning;
       }
@@ -369,7 +369,7 @@ router.post('/summarize', async (req, res) => {
       try {
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         let completion;
-        
+
         if (isMultimodalImage) {
           completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -400,7 +400,7 @@ router.post('/summarize', async (req, res) => {
       } catch (openaiErr) {
         const errMsg = openaiErr && openaiErr.message ? String(openaiErr.message) : 'Unknown OpenAI API Error';
         console.error("OpenAI API error, falling back gracefully to mock:", errMsg);
-        
+
         let detailedWarning = `OpenAI API Call failed: ${errMsg}. `;
         summary = generateMockSummary(format, mood, length, errMsg);
         apiWarning = detailedWarning;
@@ -409,8 +409,8 @@ router.post('/summarize', async (req, res) => {
       // Direct fallback to Groq if key is provided and aiProvider did not match
       try {
         const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-        const modelName = 'llama3-8b-8192';
-        
+        const modelName = 'llama-3.1-8b-instant';
+
         if (isMultimodalImage) {
           apiWarning = "Groq direct fallback failed: image uploads not supported for this model.";
           throw new Error("Groq image OCR not supported.");
