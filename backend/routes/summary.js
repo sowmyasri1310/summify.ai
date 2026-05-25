@@ -322,7 +322,7 @@ router.post('/summarize', async (req, res) => {
           detailedWarning += "Please verify your GROQ_API_KEY in your backend .env file.";
         }
 
-        summary = generateMockSummary(format, mood, length, errMsg);
+        throw groqErr;
         apiWarning = detailedWarning;
       }
     } else if (aiProvider === 'grok' && process.env.GROK_API_KEY) {
@@ -362,7 +362,7 @@ router.post('/summarize', async (req, res) => {
           detailedWarning += "Your x.ai console team does not have any active credits/licenses, or this model is restricted. Displaying a simulated summary for evaluation.";
         }
 
-        summary = generateMockSummary(format, mood, length, errMsg);
+        throw groqErr;
         apiWarning = detailedWarning;
       }
     } else if (aiProvider === 'openai' && process.env.OPENAI_API_KEY) {
@@ -402,7 +402,7 @@ router.post('/summarize', async (req, res) => {
         console.error("OpenAI API error, falling back gracefully to mock:", errMsg);
 
         let detailedWarning = `OpenAI API Call failed: ${errMsg}. `;
-        summary = generateMockSummary(format, mood, length, errMsg);
+        throw groqErr;
         apiWarning = detailedWarning;
       }
     } else if (process.env.GROQ_API_KEY) {
@@ -424,7 +424,7 @@ router.post('/summarize', async (req, res) => {
         }
       } catch (groqErr) {
         const errMsg = groqErr && groqErr.message ? String(groqErr.message) : 'Unknown Groq API Error';
-        summary = generateMockSummary(format, mood, length, errMsg);
+        throw groqErr;
         apiWarning = `Groq direct fallback failed: ${errMsg}`;
       }
     } else {
