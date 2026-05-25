@@ -17,7 +17,7 @@ const MONGO_URI =
   'mongodb://127.0.0.1:27017/summarizer';
 
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash",
+  model: "gemini-2.0-flash-lite",
   apiKey: process.env.GOOGLE_API_KEY,
 });
 
