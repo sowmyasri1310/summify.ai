@@ -12,8 +12,8 @@ const router = express.Router();
 
 function getPdfParser() {
   try {
-    const { PDFParse } = require('pdf-parse');
-    return PDFParse;
+    const pdfParseModule = require('pdf-parse');
+    return pdfParseModule;
   } catch (error) {
     throw new Error(`PDF parser initialization failed: ${error.message}`);
   }
@@ -240,12 +240,29 @@ router.post('/summarize', async (req, res) => {
     } else if (sourceType === 'file') {
       if (fileType === 'pdf') {
         try {
-          const PDFParse = getPdfParser();
+          const pdfParseModule = getPdfParser();
           const pdfBuffer = Buffer.from(fileData, 'base64');
-          const parser = new PDFParse({ data: pdfBuffer });
-          const pdfData = await parser.getText();
-          await parser.destroy();
-          textToSummarize = pdfData.text;
+          
+          if (pdfParseModule.PDFParse) {
+            const parser = new pdfParseModule.PDFParse({ data: pdfBuffer });
+            const pdfData = await parser.getText();
+            await parser.destroy();
+            textToSummarize = pdfData.text;
+          } else if (pdfParseModule.default && pdfParseModule.default.PDFParse) {
+            const parser = new pdfParseModule.default.PDFParse({ data: pdfBuffer });
+            const pdfData = await parser.getText();
+            await parser.destroy();
+            textToSummarize = pdfData.text;
+          } else if (typeof pdfParseModule === 'function') {
+            const pdfData = await pdfParseModule(pdfBuffer);
+            textToSummarize = pdfData.text;
+          } else if (pdfParseModule.default && typeof pdfParseModule.default === 'function') {
+            const pdfData = await pdfParseModule.default(pdfBuffer);
+            textToSummarize = pdfData.text;
+          } else {
+            throw new Error("Unable to resolve PDF parsing library format.");
+          }
+
           title = fileName || 'Uploaded PDF Document';
           
           if (!textToSummarize || textToSummarize.trim().length < 5) {
